@@ -28,8 +28,8 @@ services:
       - .env
     ports:
       - "${APP_HOST_PORT:-8080}:8080"
-    command: ["java", "-jar", "/app.jar"]
     restart: unless-stopped
 
 volumes:
+
   db_data:
