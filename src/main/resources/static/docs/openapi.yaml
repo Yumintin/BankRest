@@ -58,7 +58,6 @@ components:
         id: { type: string, format: uuid, description: "UUID карты" }
         maskedCardNumber: { type: string, description: "Замаскированный номер карты" }
         ownerId: { type: integer, description: "ID владельца" }
-        ownerName: { type: string, description: "Имя владельца" }
         last4: { type: string, description: "Последние 4 цифры" }
         expiryDate: { type: string, description: "Дата окончания действия" }
         status: { type: string, enum: [ACTIVE, BLOCKED, EXPIRED], description: "Статус карты" }
@@ -70,7 +69,6 @@ components:
         id: "d290f1ee-6c54-4b01-90e6-d701748f0851"
         maskedCardNumber: "**** **** **** 1234"
         ownerId: 2
-        ownerName: "Иван Петров"
         last4: "1234"
         expiryDate: "2026-12-31"
         status: "ACTIVE"
@@ -127,7 +125,6 @@ components:
           - id: "d290f1ee-6c54-4b01-90e6-d701748f0851"
             maskedCardNumber: "**** **** **** 1234"
             ownerId: 2
-            ownerName: "Иван Петров"
             last4: "1234"
             expiryDate: "2026-12-31"
             status: "ACTIVE"
@@ -294,7 +291,6 @@ paths:
                     id: "c1d290f1-ee6c-4b01-90e6-d701748f999"
                     maskedCardNumber: "**** **** **** 4321"
                     ownerId: 2
-                    ownerName: "Иван Петров"
                     last4: "4321"
                     expiryDate: "2026-12-31"
                     status: "ACTIVE"
@@ -368,7 +364,6 @@ paths:
                     id: "d290f1ee-6c54-4b01-90e6-d701748f0851"
                     maskedCardNumber: "**** **** **** 1234"
                     ownerId: 2
-                    ownerName: "Иван Петров"
                     last4: "1234"
                     expiryDate: "2026-12-31"
                     status: "ACTIVE"
@@ -447,7 +442,6 @@ paths:
                     id: "d290f1ee-6c54-4b01-90e6-d701748f0851"
                     maskedCardNumber: "**** **** **** 9999"
                     ownerId: 2
-                    ownerName: "Иван Петров"
                     last4: "9999"
                     expiryDate: "2027-12-31"
                     status: "ACTIVE"
@@ -646,7 +640,6 @@ paths:
                     id: "d290f1ee-6c54-4b01-90e6-d701748f0851"
                     maskedCardNumber: "**** **** **** 1234"
                     ownerId: 2
-                    ownerName: "Иван Петров"
                     last4: "1234"
                     expiryDate: "2026-12-31"
                     status: "BLOCKED"
@@ -721,7 +714,6 @@ paths:
                     id: "d290f1ee-6c54-4b01-90e6-d701748f0851"
                     maskedCardNumber: "**** **** **** 1234"
                     ownerId: 2
-                    ownerName: "Иван Петров"
                     last4: "1234"
                     expiryDate: "2026-12-31"
                     status: "ACTIVE"
