@@ -59,7 +59,7 @@ docker-compose down
 
 ## Миграции базы данных
 
-Проект использует Liquibase. Скрипт расположены в `src/main/resources/db/migration`
+Проект использует Liquibase. Скрипт расположен в `src/main/resources/db/migration`
 
 При запуске приложения Liquibase автоматически применит миграции к базе данных.
 
