@@ -9,7 +9,7 @@ RUN mvn -B -DskipTests package
 
 FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
-COPY --from=builder /workspace/target/*.jar /app/app.jar
+COPY --from=builder /workspace/target/*SNAPSHOT.jar /app/app.jar
 
 EXPOSE 8080
-ENTRYPOINT ["java","-jar","/app.jar"]
+ENTRYPOINT ["java","-jar","/app/app.jar"]
