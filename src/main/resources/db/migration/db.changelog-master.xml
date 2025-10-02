@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="
+           http://www.liquibase.org/xml/ns/dbchangelog
+           http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.15.xsd">
+
+    <changeSet id="000-create-uuid-ext" author="Yuri">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="postgresql"/>
+        </preConditions>
+        <sql>CREATE EXTENSION IF NOT EXISTS "uuid-ossp";</sql>
+    </changeSet>
+
+    <changeSet id="001-create-roles" author="Yuri">
+        <createTable tableName="roles">
+            <column name="name" type="varchar(50)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex tableName="roles" indexName="idx_roles_name">
+            <column name="name"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="002-create-users" author="Yuri">
+        <createTable tableName="users">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="username" type="varchar(100)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="password" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="full_name" type="varchar(255)"/>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP"/>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP"/>
+
+        </createTable>
+    </changeSet>
+
+    <changeSet id="003-create-user-roles" author="Yuri">
+        <createTable tableName="user_roles">
+            <column name="user_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="role_name" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addPrimaryKey tableName="user_roles" columnNames="user_id, role_name" constraintName="pk_user_roles"/>
+        <addForeignKeyConstraint baseTableName="user_roles"
+                                 baseColumnNames="user_id"
+                                 referencedTableName="users"
+                                 referencedColumnNames="id"
+                                 constraintName="fk_userroles_user"
+                                 onDelete="CASCADE"/>
+
+        <addForeignKeyConstraint baseTableName="user_roles"
+                                 baseColumnNames="role_name"
+                                 referencedTableName="roles"
+                                 referencedColumnNames="name"
+                                 constraintName="fk_userroles_role"
+                                 onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="004-create-cards" author="Yuri">
+        <createTable tableName="cards">
+            <column name="id" type="uuid">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="encrypted_card_number" type="text">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="last4" type="varchar(4)"/>
+
+            <column name="owner_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="expiry_date" type="varchar(20)"/>
+            <column name="status" type="varchar(20)"/>
+            <column name="balance" type="numeric(19,2)" defaultValueNumeric="0.00"/>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP"/>
+
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+
+        <addForeignKeyConstraint baseTableName="cards"
+                                 baseColumnNames="owner_id"
+                                 referencedTableName="users"
+                                 referencedColumnNames="id"
+                                 constraintName="fk_cards_user"
+                                 onDelete="CASCADE"/>
+
+        <createIndex tableName="cards" indexName="idx_cards_owner_id">
+            <column name="owner_id"/>
+        </createIndex>
+
+        <createIndex tableName="cards" indexName="idx_cards_last4">
+            <column name="last4"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="005-create-transactions" author="Yuri">
+        <createTable tableName="transactions">
+            <column name="id" type="uuid">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="from_card_id" type="uuid"/>
+            <column name="to_card_id" type="uuid"/>
+            <column name="amount" type="numeric(19,2)"/>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+
+        <addForeignKeyConstraint baseTableName="transactions"
+                                 baseColumnNames="from_card_id"
+                                 referencedTableName="cards"
+                                 referencedColumnNames="id"
+                                 constraintName="fk_tx_from_card"
+                                 onDelete="SET NULL"/>
+
+        <addForeignKeyConstraint baseTableName="transactions"
+                                 baseColumnNames="to_card_id"
+                                 referencedTableName="cards"
+                                 referencedColumnNames="id"
+                                 constraintName="fk_tx_to_card"
+                                 onDelete="SET NULL"/>
+    </changeSet>
+
+    <changeSet id="006-insert-roles" author="Yuri">
+        <insert tableName="roles">
+            <column name="name" value="ROLE_ADMIN"/>
+        </insert>
+        <insert tableName="roles">
+            <column name="name" value="ROLE_USER"/>
+        </insert>
+    </changeSet>
+
+</databaseChangeLog>

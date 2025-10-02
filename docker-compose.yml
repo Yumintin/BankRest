@@ -1,0 +1,35 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:16
+    container_name: bank_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bank}
+      POSTGRES_USER: ${POSTGRES_USER:-bankuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    ports:
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  app:
+    build: .
+    container_name: bank_app
+    depends_on:
+      - db
+    env_file:
+      - .env
+    ports:
+      - "${APP_HOST_PORT:-8080}:8080"
+    command: ["java", "-jar", "/app.jar"]
+    restart: unless-stopped
+
+volumes:
+  db_data:

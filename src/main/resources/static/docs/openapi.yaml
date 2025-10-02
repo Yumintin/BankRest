@@ -1,0 +1,803 @@
+openapi: 3.0.3
+info:
+  title: API Управления Банковскими Картами
+  version: "1.0.0"
+  description: API для управления банковскими картами. JWT-авторизация (Bearer).
+servers:
+  - url: http://localhost:8080
+    description: Локальный сервер
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    LoginRequest:
+      type: object
+      properties:
+        username: { type: string, description: "Имя пользователя (логин)" }
+        password: { type: string, description: "Пароль" }
+      required: [username, password]
+      example: { username: "admin", password: "admin" }
+
+    RegisterRequest:
+      type: object
+      properties:
+        username: { type: string, description: "Имя пользователя" }
+        password: { type: string, description: "Пароль" }
+        fullName: { type: string, description: "ФИО пользователя" }
+      required: [username, password]
+      example: { username: "user1", password: "secret", fullName: "Иван Петров" }
+
+    JwtResponse:
+      type: object
+      properties:
+        token: { type: string, description: "JWT токен" }
+      example: { token: "eyJhbGciOiJI..." }
+
+    CreateCardRequest:
+      type: object
+      properties:
+        cardNumber: { type: string, description: "Номер карты (16 цифр)" }
+        ownerId: { type: integer, format: int64, description: "ID владельца" }
+        expiryDate: { type: string, example: "2026-12-31", description: "Дата окончания действия (YYYY-MM-DD)" }
+        initialBalance: { type: number, format: double, description: "Начальный баланс" }
+      required: [cardNumber, ownerId, expiryDate]
+      example:
+        cardNumber: "4000123412341234"
+        ownerId: 2
+        expiryDate: "2026-12-31"
+        initialBalance: 1000.00
+
+    CardDto:
+      type: object
+      properties:
+        id: { type: string, format: uuid, description: "UUID карты" }
+        maskedCardNumber: { type: string, description: "Замаскированный номер карты" }
+        ownerId: { type: integer, description: "ID владельца" }
+        ownerName: { type: string, description: "Имя владельца" }
+        last4: { type: string, description: "Последние 4 цифры" }
+        expiryDate: { type: string, description: "Дата окончания действия" }
+        status: { type: string, enum: [ACTIVE, BLOCKED, EXPIRED], description: "Статус карты" }
+        balance: { type: number, format: double, description: "Баланс" }
+        createdAt: { type: string, format: date-time, description: "Дата создания" }
+        updatedAt: { type: string, format: date-time, description: "Дата обновления" }
+      required: [id, maskedCardNumber, ownerId, status, balance]
+      example:
+        id: "d290f1ee-6c54-4b01-90e6-d701748f0851"
+        maskedCardNumber: "**** **** **** 1234"
+        ownerId: 2
+        ownerName: "Иван Петров"
+        last4: "1234"
+        expiryDate: "2026-12-31"
+        status: "ACTIVE"
+        balance: 850.00
+        createdAt: "2025-01-01T10:00:00Z"
+        updatedAt: "2025-01-02T10:00:00Z"
+
+    TransferRequest:
+      type: object
+      properties:
+        fromCardId: { type: string, format: uuid, description: "UUID карты-отправителя" }
+        toCardId: { type: string, format: uuid, description: "UUID карты-получателя" }
+        amount: { type: number, format: double, description: "Сумма перевода" }
+      required: [fromCardId, toCardId, amount]
+      example:
+        fromCardId: "d290f1ee-6c54-4b01-90e6-d701748f0851"
+        toCardId: "b290f1ee-6c54-4b01-90e6-d701748f0002"
+        amount: 150.00
+
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp: { type: string, format: date-time, description: "Временная метка" }
+        status: { type: integer, description: "HTTP статус" }
+        error: { type: string, description: "Краткое название ошибки" }
+        message: { type: string, description: "Подробное сообщение" }
+        path: { type: string, description: "Путь запроса" }
+      example:
+        timestamp: "2025-10-02T12:00:00Z"
+        status: 400
+        error: "Bad Request"
+        message: "валидация не пройдена"
+        path: "/api/cards"
+
+    PageResponseCard:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/CardDto'
+        page:
+          type: integer
+          description: "Номер страницы (0-based)"
+        size:
+          type: integer
+          description: "Размер страницы"
+        totalElements:
+          type: integer
+        totalPages:
+          type: integer
+      example:
+        content:
+          - id: "d290f1ee-6c54-4b01-90e6-d701748f0851"
+            maskedCardNumber: "**** **** **** 1234"
+            ownerId: 2
+            ownerName: "Иван Петров"
+            last4: "1234"
+            expiryDate: "2026-12-31"
+            status: "ACTIVE"
+            balance: 850.00
+            createdAt: "2025-01-01T10:00:00Z"
+            updatedAt: "2025-01-02T10:00:00Z"
+        page: 0
+        size: 20
+        totalElements: 1
+        totalPages: 1
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/auth/login:
+    post:
+      tags: [auth]
+      summary: Вход (получение JWT)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JwtResponse'
+              examples:
+                success:
+                  summary: Пример токена
+                  value: { token: "eyJhbGciOiJI..." }
+        '401':
+          description: Неавторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                badCredentials:
+                  summary: Неверные учетные данные
+                  value:
+                    timestamp: "2025-10-02T12:12:00Z"
+                    status: 401
+                    error: "Unauthorized"
+                    message: "BadCredentials"
+                    path: "/api/auth/login"
+
+  /api/auth/register:
+    post:
+      tags: [auth]
+      summary: Регистрация (ADMIN)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: Зарегистрирован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JwtResponse'
+              examples:
+                ok:
+                  summary: Зарегистрирован
+                  value: { token: "eyJhbGciOiJI..." }
+        '400':
+          description: Неверные данные (валидация)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                userExists:
+                  summary: Пользователь уже существует
+                  value:
+                    timestamp: "2025-10-02T12:15:00Z"
+                    status: 400
+                    error: "Bad Request"
+                    message: "Пользователь уже существует"
+                    path: "/api/auth/register"
+        '403':
+          description: Доступ запрещён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                noRights:
+                  summary: Нет прав
+                  value:
+                    timestamp: "2025-10-02T12:33:00Z"
+                    status: 403
+                    error: "Forbidden"
+                    message: "AccessDenied"
+                    path: "/api/auth/register"
+
+  /api/cards:
+    get:
+      tags: [cards]
+      summary: Получить карты (ADMIN — все, USER — свои)
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+          description: поиск по имени владельца или last4
+        - name: page
+          in: query
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Страница карт (компакт)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageResponseCard'
+        '401':
+          description: Неавторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notAuth:
+                  summary: Не аутентифицирован
+                  value:
+                    timestamp: "2025-10-02T12:20:00Z"
+                    status: 401
+                    error: "Unauthorized"
+                    message: "Full authentication is required to access this resource"
+                    path: "/api/cards"
+
+    post:
+      tags: [cards]
+      summary: Создать карту (ADMIN)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCardRequest'
+      responses:
+        '201':
+          description: Создано
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardDto'
+              examples:
+                created:
+                  summary: Создана карта
+                  value:
+                    id: "c1d290f1-ee6c-4b01-90e6-d701748f999"
+                    maskedCardNumber: "**** **** **** 4321"
+                    ownerId: 2
+                    ownerName: "Иван Петров"
+                    last4: "4321"
+                    expiryDate: "2026-12-31"
+                    status: "ACTIVE"
+                    balance: 1000.00
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid:
+                  summary: Неверные данные
+                  value:
+                    timestamp: "2025-10-02T12:25:00Z"
+                    status: 400
+                    error: "Bad Request"
+                    message: "DataIntegrityViolationException"
+                    path: "/api/cards"
+        '401':
+          description: Неавторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notAuth:
+                  summary: Не аутентифицирован
+                  value:
+                    timestamp: "2025-10-02T12:20:00Z"
+                    status: 401
+                    error: "Unauthorized"
+                    message: "Full authentication is required to access this resource"
+                    path: "/api/cards"
+        '403':
+          description: Доступ запрещён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                noRights:
+                  summary: Нет прав
+                  value:
+                    timestamp: "2025-10-02T12:33:00Z"
+                    status: 403
+                    error: "Forbidden"
+                    message: "AccessDenied"
+                    path: "/api/cards"
+
+  /api/cards/{id}:
+    get:
+      tags: [cards]
+      summary: Получить карту по id (ADMIN или владелец)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Карта найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardDto'
+              examples:
+                exampleCard:
+                  summary: Найденная карта
+                  value:
+                    id: "d290f1ee-6c54-4b01-90e6-d701748f0851"
+                    maskedCardNumber: "**** **** **** 1234"
+                    ownerId: 2
+                    ownerName: "Иван Петров"
+                    last4: "1234"
+                    expiryDate: "2026-12-31"
+                    status: "ACTIVE"
+                    balance: 850.00
+        '401':
+          description: Неавторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notAuth:
+                  summary: Не аутентифицирован
+                  value:
+                    timestamp: "2025-10-02T12:20:00Z"
+                    status: 401
+                    error: "Unauthorized"
+                    message: "Full authentication is required to access this resource"
+                    path: "/api/cards/{id}"
+        '403':
+          description: Доступ запрещён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notOwner:
+                  summary: Не владелец
+                  value:
+                    timestamp: "2025-10-02T12:30:00Z"
+                    status: 403
+                    error: "Forbidden"
+                    message: "Access Denied"
+                    path: "/api/cards/{id}"
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notFound:
+                  summary: Карта не найдена
+                  value:
+                    timestamp: "2025-10-02T12:31:00Z"
+                    status: 404
+                    error: "Not Found"
+                    message: "Карта с id {id} не найдена"
+                    path: "/api/cards/{id}"
+
+    put:
+      tags: [cards]
+      summary: Обновить карту (ADMIN)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCardRequest'
+      responses:
+        '200':
+          description: Обновлено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardDto'
+              examples:
+                updated:
+                  summary: Обновлённая карта
+                  value:
+                    id: "d290f1ee-6c54-4b01-90e6-d701748f0851"
+                    maskedCardNumber: "**** **** **** 9999"
+                    ownerId: 2
+                    ownerName: "Иван Петров"
+                    last4: "9999"
+                    expiryDate: "2027-12-31"
+                    status: "ACTIVE"
+                    balance: 1200.00
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                bad:
+                  summary: Неверный запрос
+                  value:
+                    timestamp: "2025-10-02T12:32:00Z"
+                    status: 400
+                    error: "Bad Request"
+                    message: "DataIntegrityViolationException"
+                    path: "/api/cards/{id}"
+        '401':
+          description: Неавторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notAuth:
+                  summary: Не аутентифицирован
+                  value:
+                    timestamp: "2025-10-02T12:20:00Z"
+                    status: 401
+                    error: "Unauthorized"
+                    message: "Full authentication is required to access this resource"
+                    path: "/api/cards/{id}"
+        '403':
+          description: Доступ запрещён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                noRights:
+                  summary: Нет прав
+                  value:
+                    timestamp: "2025-10-02T12:33:00Z"
+                    status: 403
+                    error: "Forbidden"
+                    message: "AccessDenied"
+                    path: "/api/cards/{id}"
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                nf:
+                  summary: Не найдено
+                  value:
+                    timestamp: "2025-10-02T12:34:00Z"
+                    status: 404
+                    error: "Not Found"
+                    message: "Card not found"
+                    path: "/api/cards/{id}"
+
+    delete:
+      tags: [cards]
+      summary: Удалить карту (ADMIN)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Нет содержимого (удалено)
+        '403':
+          description: Доступ запрещён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                noRights:
+                  summary: Нет прав
+                  value:
+                    timestamp: "2025-10-02T12:33:00Z"
+                    status: 403
+                    error: "Forbidden"
+                    message: "Access Denied"
+                    path: "/api/cards/{id}"
+        '401':
+          description: Неавторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notAuth:
+                  summary: Не аутентифицирован
+                  value:
+                    timestamp: "2025-10-02T12:20:00Z"
+                    status: 401
+                    error: "Unauthorized"
+                    message: "Full authentication is required to access this resource"
+                    path: "/api/cards/{id}"
+        '404':
+          description: Не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notFoundDelete:
+                  summary: Не найдено
+                  value:
+                    timestamp: "2025-10-02T12:35:00Z"
+                    status: 404
+                    error: "Not Found"
+                    message: "Card not found"
+                    path: "/api/cards/{id}"
+
+  /api/cards/{id}/request-block:
+    post:
+      tags: [cards]
+      summary: Запрос на блокировку карты (USER)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '202':
+          description: Принято
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+              examples:
+                accepted:
+                  summary: Принято
+                  value: { message: "Запрос на блокировку отправлен" }
+        '401':
+          description: Неавторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notAuth:
+                  summary: Не аутентифицирован
+                  value:
+                    timestamp: "2025-10-02T12:20:00Z"
+                    status: 401
+                    error: "Unauthorized"
+                    message: "Full authentication is required to access this resource"
+                    path: "/api/cards/{id}/request-block"
+        '403':
+          description: Доступ запрещён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                forbidden:
+                  summary: Forbidden
+                  value:
+                    timestamp: "2025-10-02T12:36:00Z"
+                    status: 403
+                    error: "Forbidden"
+                    message: "Access Denied"
+                    path: "/api/cards/{id}/request-block"
+
+  /api/cards/{id}/block:
+    patch:
+      tags: [cards]
+      summary: Заблокировать карту (ADMIN)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Статус карты обновлён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardDto'
+              examples:
+                blocked:
+                  summary: Карта заблокирована
+                  value:
+                    id: "d290f1ee-6c54-4b01-90e6-d701748f0851"
+                    maskedCardNumber: "**** **** **** 1234"
+                    ownerId: 2
+                    ownerName: "Иван Петров"
+                    last4: "1234"
+                    expiryDate: "2026-12-31"
+                    status: "BLOCKED"
+                    balance: 850.00
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid:
+                  summary: Неверный запрос
+                  value:
+                    timestamp: "2025-10-02T12:40:00Z"
+                    status: 400
+                    error: "Bad Request"
+                    message: "IllegalArgumentException"
+                    path: "/api/cards/transfer"
+        '401':
+          description: Неавторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notAuth:
+                  summary: Не аутентифицирован
+                  value:
+                    timestamp: "2025-10-02T12:20:00Z"
+                    status: 401
+                    error: "Unauthorized"
+                    message: "Full authentication is required to access this resource"
+                    path: "/api/cards/{id}/block"
+        '403':
+          description: Доступ запрещён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                noRights:
+                  summary: Нет прав
+                  value:
+                    timestamp: "2025-10-02T12:33:00Z"
+                    status: 403
+                    error: "Forbidden"
+                    message: "Access Denied"
+                    path: "/api/cards/{id}"
+
+  /api/cards/transfer:
+    post:
+      tags: [cards]
+      summary: Перевод между собственными картами (USER)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferRequest'
+      responses:
+        '200':
+          description: Успешный перевод (возвращает обновлённую карту-отправитель)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardDto'
+              examples:
+                ok:
+                  summary: Перевод выполнен
+                  value:
+                    id: "d290f1ee-6c54-4b01-90e6-d701748f0851"
+                    maskedCardNumber: "**** **** **** 1234"
+                    ownerId: 2
+                    ownerName: "Иван Петров"
+                    last4: "1234"
+                    expiryDate: "2026-12-31"
+                    status: "ACTIVE"
+                    balance: 700.00
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid:
+                  summary: from and to cards are the same
+                  value:
+                    timestamp: "2025-10-02T12:40:00Z"
+                    status: 400
+                    error: "Bad Request"
+                    message: "IllegalArgumentException"
+                    path: "/api/cards/transfer"
+        '401':
+          description: Неавторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notAuth:
+                  summary: Не аутентифицирован
+                  value:
+                    timestamp: "2025-10-02T12:20:00Z"
+                    status: 401
+                    error: "Unauthorized"
+                    message: "Full authentication is required to access this resource"
+                    path: "/api/cards/transfer"
+        '403':
+          description: Доступ запрещён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                noRights:
+                  summary: Нет прав
+                  value:
+                    timestamp: "2025-10-02T12:33:00Z"
+                    status: 403
+                    error: "Forbidden"
+                    message: "Access Denied"
+                    path: "/api/cards/transfer"
+        '404':
+          description: Карта не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                noRights:
+                  summary: Source card not found
+                  value:
+                    timestamp: "2025-10-02T12:33:00Z"
+                    status: 403
+                    error: "NoSuchElementException"
+                    message: "Source card not found"
+                    path: "/api/cards/transfer"
+        '409':
+          description: Конфликт — недостаточно средств
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                noFunds:
+                  summary: Недостаточно средств
+                  value:
+                    timestamp: "2025-10-02T12:41:00Z"
+                    status: 409
+                    error: "Conflict"
+                    message: "Insufficient funds"
+                    path: "/api/cards/transfer"
